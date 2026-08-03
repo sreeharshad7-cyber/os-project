@@ -11,7 +11,7 @@ int main(int argc, char *argv[])
     char buffer[BUF_SIZE];
     char src_name[100], dest_name[100];
     if (argc == 3) {
-        /* file names supplied on command line */
+
         snprintf(src_name, sizeof(src_name), "%s", argv[1]);
         snprintf(dest_name, sizeof(dest_name), "%s", argv[2]);
     } else {
