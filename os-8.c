@@ -3,56 +3,57 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <semaphore.h>
-#define BUFFER_SIZE 5
-#define ITEMS_TO_PRODUCE 10
-int buffer[BUFFER_SIZE];
-int in = 0, out = 0;
-sem_t empty;   
-sem_t full;   
-pthread_mutex_t mutex;
-void *producer(void *arg)
+#define N 5        
+#define MEALS 3   
+sem_t forks[N]; 
+sem_t room;         
+void think(int id)
 {
-    int item;
-    for (item = 1; item <= ITEMS_TO_PRODUCE; item++) {
-        sem_wait(&empty);              /* wait for an empty slot   */
-        pthread_mutex_lock(&mutex);    /* enter critical section   */
-        buffer[in] = item;
-        printf("Producer produced item %d at slot %d\n", item, in);
-        in = (in + 1) % BUFFER_SIZE;
-        pthread_mutex_unlock(&mutex); 
-        sem_post(&full);              
-        usleep(100000);
-    }
-    return NULL;
+    printf("Philosopher %d is thinking.\n", id);
+    usleep(100000);
 }
-void *consumer(void *arg)
+void eat(int id)
 {
-    int item;
-    for (int count = 1; count <= ITEMS_TO_PRODUCE; count++) {
-        sem_wait(&full);             
-        pthread_mutex_lock(&mutex);  
-        item = buffer[out];
-        printf("\tConsumer consumed item %d from slot %d\n", item, out);
-        out = (out + 1) % BUFFER_SIZE;
-        pthread_mutex_unlock(&mutex); 
-        sem_post(&empty);              
-        usleep(150000); 
+    printf("Philosopher %d is eating.\n", id);
+    usleep(100000);
+}
+void *philosopher(void *arg)
+{
+    int id = *(int *)arg;
+    int left = id;
+    int right = (id + 1) % N;
+    for (int m = 0; m < MEALS; m++) {
+        think(id);
+        sem_wait(&room);    
+        sem_wait(&forks[left]);   /* pick up left fork  */
+        printf("Philosopher %d picked up left fork %d\n", id, left);
+        sem_wait(&forks[right]);  /* pick up right fork */
+        printf("Philosopher %d picked up right fork %d\n", id, right);
+        eat(id);
+        sem_post(&forks[right]);  
+        sem_post(&forks[left]);  
+        printf("Philosopher %d put down both forks.\n", id);
+        sem_post(&room);          
     }
     return NULL;
 }
 int main()
 {
-    pthread_t prod_thread, cons_thread;
-    sem_init(&empty, 0, BUFFER_SIZE);
-    sem_init(&full, 0, 0);          
-    pthread_mutex_init(&mutex, NULL);
-    pthread_create(&prod_thread, NULL, producer, NULL);
-    pthread_create(&cons_thread, NULL, consumer, NULL);
-    pthread_join(prod_thread, NULL);
-    pthread_join(cons_thread, NULL);
-    sem_destroy(&empty);
-    sem_destroy(&full);
-    pthread_mutex_destroy(&mutex);
-    printf("\nAll items produced and consumed successfully.\n");
+    pthread_t phil[N];
+    int ids[N];
+    for (int i = 0; i < N; i++)
+        sem_init(&forks[i], 0, 1);   
+    sem_init(&room, 0, N - 1);    
+    for (int i = 0; i < N; i++) {
+        ids[i] = i;
+        pthread_create(&phil[i], NULL, philosopher, &ids[i]);
+    }
+    for (int i = 0; i < N; i++)
+        pthread_join(phil[i], NULL);
+    for (int i = 0; i < N; i++)
+        sem_destroy(&forks[i]);
+    sem_destroy(&room);
+    printf("\nAll philosophers have finished eating. No deadlock occurred.\n");
     return 0;
 }
+ 
